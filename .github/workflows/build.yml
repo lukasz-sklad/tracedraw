@@ -1,12 +1,9 @@
 name: build
 
 on:
-  push:
-    branches: [main]
-    tags: ["v*"]
-  pull_request:
   # Run by hand (Actions > build > Run workflow): with a version, the run
   # makes the tag and the release itself, with the installers attached.
+  # Automatic push/PR builds are disabled on this fork.
   workflow_dispatch:
     inputs:
       release:

@@ -4453,6 +4453,21 @@ impl App {
         }
     }
 
+    /// Persist any pending preference changes immediately (e.g. window state on shutdown).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn flush_settings(&mut self) {
+        if self.options_snapshot.is_some() {
+            return;
+        }
+        if self.settings_changed() {
+            self.settings_pending = true;
+        }
+        if self.settings_pending {
+            self.settings.save();
+            self.settings_pending = false;
+        }
+    }
+
     /// Copy the editor's state into the preferences; true when they differ
     /// from the ones last saved or looked at, which are then remembered.
     pub fn settings_changed(&mut self) -> bool {

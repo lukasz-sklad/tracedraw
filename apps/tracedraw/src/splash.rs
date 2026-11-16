@@ -738,13 +738,23 @@ pub fn remember_window(ctx: &egui::Context, settings: &mut Settings) {
     if minimized == Some(true) {
         return;
     }
-    if let Some(m) = maximized {
-        settings.window_maximized = m;
-        if !m {
-            if let Some(r) = inner
-                .map(|r| r.size() * zoom)
-                .filter(|r| r.x >= MIN_SIZE.x && r.y >= MIN_SIZE.y)
-            {
+    let valid_size = inner
+        .map(|r| r.size() * zoom)
+        .filter(|r| r.x >= MIN_SIZE.x && r.y >= MIN_SIZE.y);
+    match maximized {
+        Some(true) => {
+            settings.window_maximized = true;
+        }
+        Some(false) => {
+            // Do not overwrite `window_maximized = false` with an uninitialized or dwarf
+            // transient size (< MIN_SIZE, e.g. splash size before growing on Wayland).
+            if let Some(r) = valid_size {
+                settings.window_maximized = false;
+                settings.window_size = [r.x, r.y];
+            }
+        }
+        None => {
+            if let Some(r) = valid_size {
                 settings.window_size = [r.x, r.y];
             }
         }
@@ -1652,5 +1662,35 @@ mod tests {
         });
         out.textures_delta.clear();
         assert!(splash.reset_requested);
+    }
+
+    #[test]
+    fn remember_window_ignores_dwarf_sizes_and_preserves_maximized() {
+        let dwarf = egui::ViewportInfo {
+            maximized: Some(false),
+            minimized: Some(false),
+            inner_rect: Some(egui::Rect::from_min_size(Pos2::ZERO, SIZE)),
+            monitor_size: Some(Vec2::new(2560.0, 1440.0)),
+            ..Default::default()
+        };
+        let mut settings = Settings::default();
+        assert!(settings.window_maximized);
+        window_frame(1.0, dwarf, |ctx| remember_window(ctx, &mut settings));
+        assert!(settings.window_maximized);
+        assert_eq!(settings.window_size, [0.0, 0.0]);
+
+        let none_max = egui::ViewportInfo {
+            maximized: None,
+            minimized: Some(false),
+            inner_rect: Some(egui::Rect::from_min_size(
+                Pos2::ZERO,
+                Vec2::new(1600.0, 950.0),
+            )),
+            monitor_size: Some(Vec2::new(2560.0, 1440.0)),
+            ..Default::default()
+        };
+        window_frame(1.0, none_max, |ctx| remember_window(ctx, &mut settings));
+        assert!(settings.window_maximized);
+        assert_eq!(settings.window_size, [1600.0, 950.0]);
     }
 }
