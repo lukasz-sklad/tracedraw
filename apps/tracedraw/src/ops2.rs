@@ -5733,8 +5733,22 @@ impl App {
             .into_iter()
             .filter(|f| !self.font_installed(f))
             .collect();
+        #[cfg(not(target_arch = "wasm32"))]
         if !missing.is_empty() {
             self.status = trf("status.missing_fonts", &[("f", &with_stand_ins(&missing))]);
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            // Browser builds rely on bundled metric stand-ins (e.g. Liberation Sans for Arial)
+            // and on-demand web fonts, so only report fonts that lack even a stand-in.
+            let unmapped: Vec<String> = missing
+                .iter()
+                .filter(|f| tracedraw_text::fonts().substitute(f).is_none())
+                .cloned()
+                .collect();
+            if !unmapped.is_empty() {
+                self.status = trf("status.missing_fonts", &[("f", &with_stand_ins(&unmapped))]);
+            }
         }
         self.missing_fonts = missing;
     }

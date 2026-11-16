@@ -9808,12 +9808,13 @@ impl App {
             return;
         }
         let w = &self.settings.warnings;
+        let show_font_warnings = !cfg!(target_arch = "wasm32");
         // The windowed application asks which font draws each missing
         // one (#936), as long as Options > Global > Warnings asks for the
         // dialog itself (its own choice, not the plain note's: a "Do not
         // show again" ticked on the note before the dialog existed left
         // the dialog unseen, #1243); the note about unread objects follows.
-        if self.ask_missing_fonts && w.ask_missing_fonts && !self.missing_fonts.is_empty() {
+        if show_font_warnings && self.ask_missing_fonts && w.ask_missing_fonts && !self.missing_fonts.is_empty() {
             self.dialog = crate::ui::dialogs::Dialog::MissingFonts(
                 crate::ui::missing_fonts::MissingFontsState::new(
                     name,
@@ -9830,7 +9831,7 @@ impl App {
         // when they were checked) opens the Warnings page when clicked,
         // so the dialog can be turned on again from where its absence is
         // noticed.
-        if self.ask_missing_fonts && !self.missing_fonts.is_empty() {
+        if show_font_warnings && self.ask_missing_fonts && !self.missing_fonts.is_empty() {
             self.status_opens_options = Some((
                 self.status.clone(),
                 crate::ui::dialogs::OptionsPage::Warnings,
@@ -9839,7 +9840,7 @@ impl App {
         let notes = crate::ui::dialogs::OpenNotes {
             name,
             unread: if w.unread_objects { unread } else { 0 },
-            fonts: if w.missing_fonts {
+            fonts: if show_font_warnings && w.missing_fonts {
                 self.missing_fonts.clone()
             } else {
                 Vec::new()
