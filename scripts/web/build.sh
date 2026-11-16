@@ -33,6 +33,7 @@ done
 cp web/manifest.webmanifest site/
 cp assets/icon/tracedraw-192.png site/icon-192.png
 cp assets/icon/tracedraw-512.png site/icon-512.png
+cp sample.tdraw site/sample.tdraw
 build=$(cat site/index.html site/tracedraw.js site/tracedraw_bg.wasm site/manifest.webmanifest site/lang/*.toml \
     | (sha256sum 2>/dev/null || shasum -a 256) | cut -c1-16)
 sed -e "s/@VERSION@/$version/" -e "s/@BUILD@/$build/" web/sw.js > site/sw.js

@@ -12,17 +12,19 @@ pub enum Theme {
     MediumLight,
     MediumDark,
     Dark,
+    Sepia,
     /// The desktop's high contrast colours (the classic black theme
     /// where the desktop has none).
     HighContrast,
 }
 
 impl Theme {
-    pub const ALL: [Theme; 5] = [
+    pub const ALL: [Theme; 6] = [
         Theme::Light,
         Theme::MediumLight,
         Theme::MediumDark,
         Theme::Dark,
+        Theme::Sepia,
         Theme::HighContrast,
     ];
 
@@ -33,15 +35,22 @@ impl Theme {
             Theme::MediumLight => "medium_light",
             Theme::MediumDark => "medium_dark",
             Theme::Dark => "dark",
+            Theme::Sepia => "sepia",
             Theme::HighContrast => "high_contrast",
         }
     }
 
     /// The theme a preference names; Light for anything else.
     pub fn from_id(id: &str) -> Theme {
+        let lower = id.trim().to_ascii_lowercase();
+        match lower.as_str() {
+            "ciemny" => return Theme::Dark,
+            "jasny" => return Theme::Light,
+            _ => {}
+        }
         Theme::ALL
             .into_iter()
-            .find(|t| t.id() == id)
+            .find(|t| t.id() == lower)
             .unwrap_or(Theme::Light)
     }
 
@@ -52,6 +61,7 @@ impl Theme {
             Theme::MediumLight => "options.theme_medium_light",
             Theme::MediumDark => "options.theme_medium_dark",
             Theme::Dark => "options.theme_dark",
+            Theme::Sepia => "options.theme_sepia",
             Theme::HighContrast => "options.theme_high_contrast",
         }
     }
@@ -78,6 +88,7 @@ impl Theme {
             Theme::MediumLight => &MEDIUM_LIGHT,
             Theme::MediumDark => &MEDIUM_DARK,
             Theme::Dark => &DARK,
+            Theme::Sepia => &SEPIA,
             Theme::HighContrast => contrast_palette(),
         }
     }
@@ -450,6 +461,44 @@ const DARK: Palette = Palette {
     ruler_label: rgb(0xA8A8A8),
     ruler_marker: rgb(0xF0F0F0),
     desktop: rgb(0x3D3D3D),
+};
+
+const SEPIA: Palette = Palette {
+    panel: rgb(0xF3EAD8),
+    menu_bar: rgb(0xEAE0CD),
+    panel_dark: rgb(0xE6DBC4),
+    border: rgb(0xE2D5BE),
+    icon_off: rgb(0xBAAC96),
+    text: rgb(0x3D3224),
+    text_dim: rgb(0x6E5D47),
+    page_shadow: rgb(0xC2B49A),
+    page_border: rgb(0xA6967C),
+    ruler_bg: rgb(0xF3EAD8),
+    tool_active: rgb(0xDFCBB0),
+    tool_hover: rgb(0xEFE4D0),
+    icon: rgb(0x3D3224),
+    button: rgb(0xE8DEC9),
+    control_border: rgb(0xBAA98E),
+    slider_rail: rgb(0xCFC0A6),
+    field: rgb(0xFDFAF3),
+    menu: rgb(0xFDFAF3),
+    menu_gutter: rgb(0xF3EAD8),
+    menu_hover: rgb(0xDFCBB0),
+    menu_hover_line: rgb(0x9A6B2F),
+    menu_text_off: rgb(0xBAAC96),
+    title_bar: rgb(0xFDFAF3),
+    window_border: rgb(0xC6B79E),
+    selected_row: rgb(0xDFCBB0),
+    hovered_row: rgb(0xEFE4D0),
+    selected_row_line: rgb(0xB89B72),
+    control_fill: rgb(0xEFE4D0),
+    tab_strip: rgb(0xEDE2CD),
+    tab: rgb(0xE2D5BE),
+    tab_active: rgb(0xFDFAF3),
+    ruler_tick: rgb(0x8C7B65),
+    ruler_label: rgb(0x6E5D47),
+    ruler_marker: rgb(0x3D3224),
+    desktop: rgb(0xF3EAD8),
 };
 
 pub struct Tokens;
@@ -1371,6 +1420,7 @@ mod theme_tests {
             Theme::MediumLight,
             Theme::MediumDark,
             Theme::Dark,
+            Theme::Sepia,
         ] {
             let (_, line) = icon_button_in(t, false, true).expect("on look");
             let gap = (luma(line.color) - luma(t.palette().panel)).abs();

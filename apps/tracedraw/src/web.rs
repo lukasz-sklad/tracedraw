@@ -40,6 +40,67 @@ pub fn request_repaint() {
     });
 }
 
+/// Current page URL query string (`""` if unavailable).
+fn page_search() -> String {
+    web_sys::window()
+        .and_then(|w| w.location().search().ok())
+        .unwrap_or_default()
+}
+
+/// True when the page is embedded inside an iframe (`window.self !== window.top`).
+pub fn in_iframe() -> bool {
+    let Some(window) = web_sys::window() else {
+        return false;
+    };
+    let top = js_sys::Reflect::get(&window, &wasm_bindgen::JsValue::from_str("top")).ok();
+    match top {
+        Some(t) => t != wasm_bindgen::JsValue::from(window),
+        None => true,
+    }
+}
+
+/// Apply `?theme=`, `?lang=`, `?new`/`?empty`, and default `"pl"` language for first-time
+/// browser visitors without saved preferences.
+pub fn apply_launch_overrides(settings: &mut crate::settings::Settings) {
+    let search = page_search();
+    if let Some(theme) = crate::web_page::theme_from_query(&search) {
+        settings.theme = theme.to_string();
+    }
+    if let Some(lang) = crate::web_page::lang_from_query(&search) {
+        settings.language = lang;
+    } else if settings.language.is_empty() && storage_get(crate::settings::WEB_KEY).is_none() {
+        settings.language = "pl".to_string();
+    }
+    if crate::web_page::wants_new_doc(&search) {
+        settings.startup = crate::settings::Startup::NewDocument;
+    }
+}
+
+/// True when the startup browser notice modal should be skipped (URL launch parameters,
+/// queued files, or iframe embed).
+pub fn suppress_startup_notice() -> bool {
+    in_iframe() || crate::web_page::has_launch_override(&page_search()) || has_launched_files()
+}
+
+fn has_launched_files() -> bool {
+    let Some(window) = web_sys::window() else {
+        return false;
+    };
+    js_sys::Reflect::get(&window, &"tracedrawLaunched".into())
+        .ok()
+        .and_then(|q| q.dyn_into::<js_sys::Array>().ok())
+        .is_some_and(|arr| arr.length() > 0)
+}
+
+/// Read and clear a pending theme pushed from host `postMessage` (`window.__tdPendingTheme`).
+pub fn take_pending_theme() -> Option<&'static str> {
+    let window = web_sys::window()?;
+    let key = wasm_bindgen::JsValue::from_str("__tdPendingTheme");
+    let raw = js_sys::Reflect::get(&window, &key).ok()?.as_string()?;
+    let _ = js_sys::Reflect::set(&window, &key, &wasm_bindgen::JsValue::UNDEFINED);
+    crate::web_page::normalize_theme_id(&raw)
+}
+
 /// Set when the page may hold files the system opened with the installed
 /// app (`index.html` queues them in `window.tracedrawLaunched`): at start,
 /// and on each `tracedraw-launched` event. The frame loop looks at the

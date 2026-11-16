@@ -2496,7 +2496,7 @@ pub fn config_dir() -> Option<PathBuf> {
 
 /// Local storage key of the settings in the browser build.
 #[cfg(target_arch = "wasm32")]
-const WEB_KEY: &str = "tracedraw.settings";
+pub(crate) const WEB_KEY: &str = "tracedraw.settings";
 
 impl Settings {
     /// The preferences as TraceDraw comes, keeping what is history rather
@@ -2611,10 +2611,12 @@ impl Settings {
         #[cfg(target_arch = "wasm32")]
         {
             // The browser build keeps settings in local storage.
-            return crate::web::storage_get(WEB_KEY)
+            let mut settings = crate::web::storage_get(WEB_KEY)
                 .and_then(|s| serde_json::from_str::<Settings>(&s).ok())
                 .map(Settings::upgrade)
                 .unwrap_or_default();
+            crate::web::apply_launch_overrides(&mut settings);
+            return settings;
         }
         #[allow(unreachable_code)]
         let Some(p) = Self::path() else {

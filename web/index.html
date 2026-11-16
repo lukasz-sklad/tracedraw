@@ -65,6 +65,67 @@
     #loading .notice { font-size: 12px; color: #5a6b80; }
     #loading-error { color: #a1260d; font-weight: 600; }
   </style>
+  <script>
+    (function () {
+      var PALETTE = {
+        dark: { bg: "#18181b", text: "#e4e4e7", notice: "#a1a1aa", link: "#7fc3ff" },
+        medium_dark: { bg: "#2b2b2e", text: "#eaeaea", notice: "#b0b0b0", link: "#7fc3ff" },
+        light: { bg: "#f4f4f5", text: "#18181b", notice: "#52525b", link: "#0b5cad" },
+        medium_light: { bg: "#dcdcdc", text: "#1a1a1a", notice: "#595959", link: "#0b5cad" },
+        sepia: { bg: "#f3ead8", text: "#3d3224", notice: "#6e5d47", link: "#7a511c" }
+      };
+      function normTheme(raw) {
+        if (!raw) return null;
+        var t = String(raw).trim().toLowerCase();
+        if (t === "ciemny" || t === "dark") return "dark";
+        if (t === "jasny" || t === "light") return "light";
+        if (t === "sepia") return "sepia";
+        if (t === "medium_dark" || t === "medium-dark") return "medium_dark";
+        if (t === "medium_light" || t === "medium-light") return "medium_light";
+        return null;
+      }
+      function applyPageTheme(t) {
+        var p = PALETTE[t];
+        if (!p) return;
+        document.documentElement.dataset.theme = t;
+        var el = document.getElementById("td-theme");
+        if (!el) {
+          el = document.createElement("style");
+          el.id = "td-theme";
+          document.head.appendChild(el);
+        }
+        el.textContent =
+          "html, body { background: " + p.bg + " !important; }" +
+          "#loading { color: " + p.text + " !important; }" +
+          "#loading .notice { color: " + p.notice + " !important; }" +
+          "#loading a { color: " + p.link + " !important; }";
+      }
+      var params = new URLSearchParams(window.location.search);
+      var initial = normTheme(params.get("theme"));
+      if (!initial) {
+        try {
+          var saved = localStorage.getItem("tracedraw.settings");
+          if (saved) initial = normTheme(JSON.parse(saved).theme);
+        } catch (_) {}
+      }
+      if (!initial && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        initial = "dark";
+      }
+      if (initial) applyPageTheme(initial);
+      window.addEventListener("message", function (ev) {
+        var d = ev && ev.data;
+        if (!d || typeof d !== "object") return;
+        if (d.type === "set_theme" || d.action === "set_theme") {
+          var next = normTheme(d.theme);
+          if (next) {
+            applyPageTheme(next);
+            window.__tdPendingTheme = next;
+            try { window.dispatchEvent(new Event("resize")); } catch (_) {}
+          }
+        }
+      });
+    })();
+  </script>
 </head>
 <!-- data-wasm-size: the module's size in bytes and @VERSION@ the version,
      both filled in by the build (scripts/web/build.sh, CI). -->
@@ -153,6 +214,48 @@
         window.dispatchEvent(new Event("tracedraw-launched"));
       });
     }
+
+    (function () {
+      var qs = new URLSearchParams(window.location.search);
+      var fileUrl = qs.get("file") || qs.get("url");
+      var wantNew = qs.has("new") || qs.has("empty");
+      var wantSample = !wantNew && (qs.has("sample") || qs.has("d" + "emo"));
+      if (!fileUrl && !wantSample) return;
+      var target = fileUrl ? fileUrl.trim() : "./sample.tdraw";
+      function fileNameFrom(u) {
+        try {
+          var clean = decodeURIComponent(u.split("?")[0].split("#")[0]);
+          var base = clean.split("/").pop();
+          return base || "drawing.tdraw";
+        } catch (_) {
+          return "drawing.tdraw";
+        }
+      }
+      async function fetchWithCors(url) {
+        var candidates = [url];
+        if (/^https?:\/\//i.test(url)) {
+          candidates.push("https://lmk.one/api/cors?url=" + encodeURIComponent(url));
+          candidates.push("https://corsproxy.io/?url=" + encodeURIComponent(url));
+        }
+        var lastErr = null;
+        for (var i = 0; i < candidates.length; i++) {
+          try {
+            var res = await fetch(candidates[i]);
+            if (res.ok) return new Uint8Array(await res.arrayBuffer());
+            lastErr = new Error("HTTP " + res.status);
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        throw lastErr || new Error("download failed");
+      }
+      fetchWithCors(target).then(function (bytes) {
+        window.tracedrawLaunched.push({ name: fileNameFrom(target), bytes: bytes });
+        window.dispatchEvent(new Event("tracedraw-launched"));
+      }).catch(function (e) {
+        console.warn("TraceDraw: URL launch file could not be loaded: " + e);
+      });
+    })();
 
     const status = document.getElementById("loading-status");
     const bar = document.getElementById("loading-bar");

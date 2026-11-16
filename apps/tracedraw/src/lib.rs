@@ -735,7 +735,14 @@ impl Shell {
             (Some(app::App::new(&cc.egui_ctx, open)), None)
         };
         #[cfg(target_arch = "wasm32")]
-        let app = Some(app::App::new(&cc.egui_ctx, open));
+        let app = {
+            let app = app::App::new(&cc.egui_ctx, open);
+            ui::apply_theme(
+                &cc.egui_ctx,
+                &crate::settings::effective_theme(&app.settings),
+            );
+            Some(app)
+        };
         Shell {
             app,
             #[cfg(not(target_arch = "wasm32"))]
@@ -1116,11 +1123,28 @@ impl eframe::App for Shell {
                 ui.ctx().request_repaint();
             }
         }
-        // Files the system opened with the installed browser app (#646).
+        // Files the system or URL parameters opened with the browser build (#646).
         #[cfg(target_arch = "wasm32")]
-        if !app.closing_all && matches!(app.dialog, crate::ui::dialogs::Dialog::None) {
-            for path in web::take_launched_files() {
-                app.open_path(path);
+        {
+            if let Some(theme_id) = web::take_pending_theme() {
+                app.settings.theme = theme_id.to_string();
+                ui.ctx().request_repaint();
+            }
+            if !app.closing_all
+                && matches!(
+                    app.dialog,
+                    crate::ui::dialogs::Dialog::None | crate::ui::dialogs::Dialog::WebNotice
+                )
+            {
+                let launched = web::take_launched_files();
+                if !launched.is_empty() {
+                    if matches!(app.dialog, crate::ui::dialogs::Dialog::WebNotice) {
+                        app.dialog = crate::ui::dialogs::Dialog::None;
+                    }
+                    for path in launched {
+                        app.open_path(path);
+                    }
+                }
             }
         }
         // Requests of AI agents for the open drawing (MCP).

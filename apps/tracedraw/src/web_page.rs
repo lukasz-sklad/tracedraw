@@ -173,6 +173,70 @@ pub fn css_px(value: &str) -> Option<f32> {
         .filter(|v| v.is_finite() && *v > 0.0)
 }
 
+/// Normalize a theme string from URL parameters or `postMessage` into a
+/// [`crate::theme::Theme`] identifier (`None` for unrecognized values).
+pub fn normalize_theme_id(raw: &str) -> Option<&'static str> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "light" | "jasny" => Some("light"),
+        "medium_light" | "medium-light" => Some("medium_light"),
+        "medium_dark" | "medium-dark" => Some("medium_dark"),
+        "dark" | "ciemny" => Some("dark"),
+        "sepia" => Some("sepia"),
+        "high_contrast" | "high-contrast" => Some("high_contrast"),
+        _ => None,
+    }
+}
+
+/// Return an iterator over `(key, value)` pairs in a URL query string.
+fn query_pairs(search: &str) -> impl Iterator<Item = (&str, &str)> {
+    search
+        .trim_start_matches('?')
+        .split('&')
+        .filter(|part| !part.is_empty())
+        .map(|part| match part.split_once('=') {
+            Some((k, v)) => (k, v),
+            None => (part, ""),
+        })
+}
+
+/// Read a `?theme=` parameter from a URL query string.
+pub fn theme_from_query(search: &str) -> Option<&'static str> {
+    query_pairs(search)
+        .filter(|(k, _)| k.eq_ignore_ascii_case("theme"))
+        .filter_map(|(_, v)| normalize_theme_id(v))
+        .last()
+}
+
+/// Read `?lang=` (`pl` / `en` / supported codes) from a URL query string.
+pub fn lang_from_query(search: &str) -> Option<String> {
+    let raw = query_pairs(search)
+        .filter(|(k, _)| k.eq_ignore_ascii_case("lang"))
+        .map(|(_, v)| v.trim())
+        .filter(|v| !v.is_empty())
+        .last()?;
+    crate::i18n::LANGUAGES
+        .iter()
+        .find(|(code, _)| code.eq_ignore_ascii_case(raw))
+        .map(|(code, _)| (*code).to_string())
+}
+
+/// True when `?new` or `?empty` asks to skip autoloading and open an empty drawing.
+pub fn wants_new_doc(search: &str) -> bool {
+    query_pairs(search)
+        .any(|(k, _)| k.eq_ignore_ascii_case("new") || k.eq_ignore_ascii_case("empty"))
+}
+
+/// True when URL query parameters request immediate file/document startup.
+pub fn has_launch_override(search: &str) -> bool {
+    query_pairs(search).any(|(k, _)| {
+        let low = k.to_ascii_lowercase();
+        matches!(
+            low.as_str(),
+            "file" | "url" | "new" | "empty" | "sample" | "demo"
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -186,6 +250,25 @@ mod tests {
         assert_eq!(css_px("1em"), None);
         assert_eq!(css_px("0px"), None);
         assert_eq!(css_px(""), None);
+    }
+
+    #[test]
+    fn query_helpers_parse_theme_lang_and_launch_flags() {
+        assert_eq!(theme_from_query("?theme=sepia"), Some("sepia"));
+        assert_eq!(theme_from_query("?theme=ciemny"), Some("dark"));
+        assert_eq!(theme_from_query("?theme=jasny"), Some("light"));
+        assert_eq!(theme_from_query("?theme=unknown"), None);
+        assert_eq!(lang_from_query("?lang=pl").as_deref(), Some("pl"));
+        assert_eq!(lang_from_query("?lang=pt-br").as_deref(), Some("pt-BR"));
+        assert_eq!(lang_from_query("?lang=xx"), None);
+        assert!(wants_new_doc("?new&theme=dark"));
+        assert!(wants_new_doc("?empty=1"));
+        assert!(!wants_new_doc("?sample"));
+        assert!(has_launch_override("?file=https://example.com/a.cdr"));
+        assert!(has_launch_override("?url=sample.tdraw"));
+        assert!(has_launch_override("?sample"));
+        assert!(has_launch_override("?new"));
+        assert!(!has_launch_override("?theme=sepia"));
     }
 
     const PAGE: &str = include_str!("../../../web/index.html");

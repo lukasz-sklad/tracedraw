@@ -3596,6 +3596,11 @@ impl App {
                 }
             }
         }
+        #[cfg(target_arch = "wasm32")]
+        if crate::files::WEB && !crate::web::suppress_startup_notice() {
+            app.show_web_notice();
+        }
+        #[cfg(not(target_arch = "wasm32"))]
         if crate::files::WEB {
             app.show_web_notice();
         }
@@ -9499,14 +9504,24 @@ impl App {
     /// by the update card (`ui/update_card.rs`). A copy
     /// installed from the Microsoft Store never checks: the Store updates it.
     pub fn update_tick(&mut self, now: u64, ctx: Option<egui::Context>) {
-        if crate::files::WEB || cfg!(test) || crate::updates::store_install() {
-            return;
+        // Disable automatic online startup update check/prompt in local builds while
+        // keeping `update_tick_desktop` exercised by unit tests.
+        #[cfg(not(test))]
+        {
+            let _ = (now, ctx);
         }
-        self.update_tick_desktop(now, ctx);
+        #[cfg(test)]
+        {
+            if crate::files::WEB || cfg!(test) || crate::updates::store_install() {
+                return;
+            }
+            self.update_tick_desktop(now, ctx);
+        }
     }
 
     /// [`Self::update_tick`] on a desktop: first ask whether to check at
     /// all (once, at first start), then the daily check.
+    #[cfg_attr(not(test), allow(dead_code))]
     fn update_tick_desktop(&mut self, now: u64, ctx: Option<egui::Context>) {
         if !self.settings.update_check_asked {
             // No check before the answer; the question waits for any
