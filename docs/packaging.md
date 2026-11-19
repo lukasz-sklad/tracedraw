@@ -25,6 +25,16 @@ with `zsyncmake` (the `zsync` package).
   Linux tar.gz (the program is the same as in the other packages) with
   the desktop entry, icons, file type and the AppStream description in
   `packaging/linux/flatpak/`.
+- `packaging/linux/flatpak/io.github.tracedraw.TraceDraw.metainfo.xml`
+  carries the `<screenshots>` and `<branding>` metadata required by
+  Flathub AppStream validation, while `packaging/linux/flatpak/manifest.sh`
+  rewrites the MIME icon name to `io.github.tracedraw.TraceDraw` and
+  uses `--filesystem=home` (removable media and external drives open
+  through the system file portal).
+- `packaging/linux/build-local.sh` detects the host processor on local
+  Linux builds outside CI (for example Steam Deck or Steam Machine) and
+  compiles with `-C target-cpu=native` (and optional `--flatpak`
+  packaging), while CI builds keep the standard portable CPU target.
 - `packaging/linux/flatpak/manifest.sh` writes the manifest. The
   `flatpak` job builds `tracedraw-<version>-linux-x86_64.flatpak` from the
   x86_64 tar.gz on every run and the release attaches it. A version's

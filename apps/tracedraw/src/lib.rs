@@ -494,7 +494,14 @@ pub fn run() -> eframe::Result<()> {
     if x11 && !x11_asked {
         log::info!("opening the window through X11 for the desktop's title bar");
     }
-    let splash = settings.show_splash && !plain;
+    #[cfg(target_os = "linux")]
+    let wayland_native = !x11 && title_bar::env_set("WAYLAND_DISPLAY");
+    #[cfg(not(target_os = "linux"))]
+    let wayland_native = false;
+    // Wayland compositors (notably KWin) do not reliably grow the undecorated
+    // 640x380 splash window into a normal resized main window; open the main
+    // window at its remembered/maximized size right away on native Wayland.
+    let splash = use_splash_window(settings.show_splash, plain, wayland_native);
     let viewport = if splash {
         // The splash has no frame, so it cannot be dragged larger; it is
         // still created resizable: some window managers (Xfwm4) keep a
@@ -692,6 +699,17 @@ struct Shell {
     /// the window is drawn plain meanwhile, never held (#1388).
     #[cfg(not(target_arch = "wasm32"))]
     deferred: Option<Option<std::path::PathBuf>>,
+    /// Window content size seen at startup while settling, so late WM maximize
+    /// / resize events trigger one re-fit of the opened drawing.
+    #[cfg(not(target_arch = "wasm32"))]
+    last_fit_window: Option<egui::Vec2>,
+}
+
+/// Whether the small splash window is used for startup instead of opening
+/// the main window directly.
+#[cfg(not(target_arch = "wasm32"))]
+fn use_splash_window(show_splash: bool, plain: bool, wayland_native: bool) -> bool {
+    show_splash && !plain && !wayland_native
 }
 
 /// Where the check of the OpenGL renderer stands (`Shell::check_renderer`).
@@ -760,6 +778,8 @@ impl Shell {
             fonts,
             #[cfg(not(target_arch = "wasm32"))]
             deferred,
+            #[cfg(not(target_arch = "wasm32"))]
+            last_fit_window: None,
         }
     }
 
@@ -780,6 +800,7 @@ impl Shell {
             check_frames: 0,
             fonts: theme::FontLoad::default(),
             deferred: None,
+            last_fit_window: None,
         }
     }
 
@@ -939,6 +960,14 @@ mod start_tests {
         assert!(editor_can_start(true, false, &pending));
         assert!(!editor_can_start(true, true, &pending));
         let _ = tx.send(());
+    }
+
+    #[test]
+    fn splash_window_is_skipped_on_native_wayland() {
+        assert!(use_splash_window(true, false, false));
+        assert!(!use_splash_window(false, false, false));
+        assert!(!use_splash_window(true, true, false));
+        assert!(!use_splash_window(true, false, true));
     }
 }
 
@@ -1164,6 +1193,26 @@ impl eframe::App for Shell {
                 .request_repaint_after(std::time::Duration::from_millis(100));
         }
         frame_mark("before the interface");
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.window_settle.settling() && app.has_document() {
+            let cur = ui.ctx().content_rect().size();
+            if cur.x > 0.0 && cur.y > 0.0 {
+                let untouched = ui.ctx().input(|i| {
+                    !i.pointer.any_down()
+                        && i.smooth_scroll_delta == egui::Vec2::ZERO
+                        && (i.zoom_delta() - 1.0).abs() < 1e-4
+                });
+                match self.last_fit_window {
+                    Some(prev) if untouched && (cur.x > prev.x * 1.15 || cur.y > prev.y * 1.15) => {
+                        app.fit_pending = true;
+                        app.open_view_pending = true;
+                        self.last_fit_window = Some(cur);
+                    }
+                    None => self.last_fit_window = Some(cur),
+                    _ => {}
+                }
+            }
+        }
         ui::root(app, ui);
         frame_mark("the dialogs");
         // The frame around the safe area (#1917).
@@ -1226,6 +1275,8 @@ impl eframe::App for Shell {
                 return;
             }
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        app.flush_settings();
         app.backup_now();
     }
 
