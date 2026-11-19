@@ -64,15 +64,28 @@
     #loading .links a { white-space: nowrap; }
     #loading .notice { font-size: 12px; color: #5a6b80; }
     #loading-error { color: #a1260d; font-weight: 600; }
+    #loading .engine-selector {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px;
+      border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.14);
+      background: rgba(0, 0, 0, 0.05); font-size: 11px;
+    }
+    #loading .engine-label { opacity: 0.78; font-weight: 500; padding: 0 4px; }
+    #loading .engine-btn {
+      padding: 3px 9px; border-radius: 999px; text-decoration: none;
+      font-weight: 600; font-size: 11px; color: inherit; opacity: 0.75;
+    }
+    #loading .engine-btn.active {
+      background: #1a56db; color: #ffffff !important; opacity: 1;
+    }
   </style>
   <script>
     (function () {
       var PALETTE = {
-        dark: { bg: "#18181b", text: "#e4e4e7", notice: "#a1a1aa", link: "#7fc3ff" },
-        medium_dark: { bg: "#2b2b2e", text: "#eaeaea", notice: "#b0b0b0", link: "#7fc3ff" },
-        light: { bg: "#f4f4f5", text: "#18181b", notice: "#52525b", link: "#0b5cad" },
-        medium_light: { bg: "#dcdcdc", text: "#1a1a1a", notice: "#595959", link: "#0b5cad" },
-        sepia: { bg: "#f3ead8", text: "#3d3224", notice: "#6e5d47", link: "#7a511c" }
+        dark: { bg: "#18181b", text: "#e4e4e7", notice: "#a1a1aa", link: "#7fc3ff", pill: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.14)" },
+        medium_dark: { bg: "#2b2b2e", text: "#eaeaea", notice: "#b0b0b0", link: "#7fc3ff", pill: "rgba(255,255,255,0.06)", border: "rgba(255,255,255,0.14)" },
+        light: { bg: "#f4f4f5", text: "#18181b", notice: "#52525b", link: "#0b5cad", pill: "rgba(0,0,0,0.04)", border: "rgba(0,0,0,0.12)" },
+        medium_light: { bg: "#dcdcdc", text: "#1a1a1a", notice: "#595959", link: "#0b5cad", pill: "rgba(0,0,0,0.04)", border: "rgba(0,0,0,0.12)" },
+        sepia: { bg: "#f3ead8", text: "#3d3224", notice: "#6e5d47", link: "#7a511c", pill: "rgba(61,50,36,0.06)", border: "rgba(61,50,36,0.16)" }
       };
       function normTheme(raw) {
         if (!raw) return null;
@@ -98,7 +111,8 @@
           "html, body { background: " + p.bg + " !important; }" +
           "#loading { color: " + p.text + " !important; }" +
           "#loading .notice { color: " + p.notice + " !important; }" +
-          "#loading a { color: " + p.link + " !important; }";
+          "#loading a { color: " + p.link + " !important; }" +
+          "#loading .engine-selector { background: " + p.pill + " !important; border-color: " + p.border + " !important; }";
       }
       var params = new URLSearchParams(window.location.search);
       var initial = normTheme(params.get("theme"));
@@ -106,6 +120,11 @@
         try {
           var saved = localStorage.getItem("tracedraw.settings");
           if (saved) initial = normTheme(JSON.parse(saved).theme);
+        } catch (_) {}
+      }
+      if (!initial) {
+        try {
+          initial = normTheme(localStorage.getItem("pl_craft_theme_v3"));
         } catch (_) {}
       }
       if (!initial && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
@@ -180,6 +199,11 @@
       </g>
       <rect x="0.5" y="0.5" width="639" height="379" fill="none" stroke="#fff" stroke-opacity="0.157"/>
     </svg>
+    <p class="engine-selector">
+      <span class="engine-label">GPU:</span>
+      <a href="?backend=webgpu" class="engine-btn active" id="btn-webgpu">&#x26A1; WebGPU</a>
+      <a href="?webgl=1" class="engine-btn" id="btn-webgl">&#x2699; WebGL2</a>
+    </p>
     <p id="loading-error" role="alert" hidden></p>
     <p><b>TraceDraw</b> <span class="alpha">alpha</span>: open-source vector editor that opens .cdr files. Written in Rust, free under the MIT or Apache-2.0 license.</p>
     <p class="notice">TraceDraw is an independent project, not affiliated with, endorsed by or sponsored by Corel Corporation or Alludo. CorelDRAW is a registered trademark of Corel Corporation. .cdr support is implemented independently, for interoperability.</p>
@@ -260,6 +284,24 @@
     const status = document.getElementById("loading-status");
     const bar = document.getElementById("loading-bar");
     const error = document.getElementById("loading-error");
+    const btnWebgpu = document.getElementById("btn-webgpu");
+    const btnWebgl = document.getElementById("btn-webgl");
+    const launchParams = new URLSearchParams(window.location.search);
+    const backendParam = (launchParams.get("backend") || "").trim().toLowerCase();
+    const isWebglMode = launchParams.has("webgl") || backendParam === "webgl2" || backendParam === "webgl";
+    if (btnWebgpu && btnWebgl) {
+      btnWebgpu.classList.toggle("active", !isWebglMode);
+      btnWebgl.classList.toggle("active", isWebglMode);
+      const gpuHref = new URLSearchParams(launchParams);
+      gpuHref.delete("webgl");
+      gpuHref.set("backend", "webgpu");
+      btnWebgpu.href = "?" + gpuHref.toString();
+      const glHref = new URLSearchParams(launchParams);
+      glHref.delete("webgpu");
+      glHref.delete("backend");
+      glHref.set("webgl", "1");
+      btnWebgl.href = "?" + glHref.toString();
+    }
     const total = Number(document.body.dataset.wasmSize) || 0;
     // The bar's length at 100 %, in the splash's units.
     const FULL = 552;
@@ -318,6 +360,13 @@
         const response = await download();
         await init({ module_or_path: response });
       } catch (e) {
+        const msg = String(e || "");
+        if (!isWebglMode && (msg.includes("WebGPU") || msg.includes("wgpu") || msg.includes("Adapter"))) {
+          launchParams.delete("webgpu");
+          launchParams.set("webgl", "1");
+          window.location.search = launchParams.toString();
+          return;
+        }
         say("TraceDraw could not start");
         bar.setAttribute("fill", "#e0533d");
         error.textContent = "TraceDraw could not start: " + e + ". A browser with WebAssembly and WebGL 2 is needed; the desktop app works without one.";

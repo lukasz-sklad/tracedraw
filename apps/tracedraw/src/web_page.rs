@@ -237,6 +237,32 @@ pub fn has_launch_override(search: &str) -> bool {
     })
 }
 
+/// Read requested graphics backend from URL parameters (`"webgl2"` when `?webgl` /
+/// `?webgl=1` / `?backend=webgl2` / `?backend=webgl` is set, otherwise `"webgpu"`).
+pub fn backend_from_query(search: &str) -> &'static str {
+    let mut backend = "webgpu";
+    for (k, v) in query_pairs(search) {
+        if k.eq_ignore_ascii_case("webgl") {
+            let val = v.trim();
+            if val.is_empty() || val == "1" || val.eq_ignore_ascii_case("true") {
+                backend = "webgl2";
+            }
+        } else if k.eq_ignore_ascii_case("webgpu") {
+            let val = v.trim();
+            if val.is_empty() || val == "1" || val.eq_ignore_ascii_case("true") {
+                backend = "webgpu";
+            }
+        } else if k.eq_ignore_ascii_case("backend") {
+            match v.trim().to_ascii_lowercase().as_str() {
+                "webgl" | "webgl2" => backend = "webgl2",
+                "webgpu" | "wgpu" => backend = "webgpu",
+                _ => {}
+            }
+        }
+    }
+    backend
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,6 +295,12 @@ mod tests {
         assert!(has_launch_override("?sample"));
         assert!(has_launch_override("?new"));
         assert!(!has_launch_override("?theme=sepia"));
+        assert_eq!(backend_from_query(""), "webgpu");
+        assert_eq!(backend_from_query("?backend=webgpu"), "webgpu");
+        assert_eq!(backend_from_query("?webgpu=1"), "webgpu");
+        assert_eq!(backend_from_query("?webgl=1"), "webgl2");
+        assert_eq!(backend_from_query("?webgl"), "webgl2");
+        assert_eq!(backend_from_query("?backend=webgl2&theme=sepia"), "webgl2");
     }
 
     const PAGE: &str = include_str!("../../../web/index.html");
@@ -536,6 +568,8 @@ mod tests {
             "id=\"loading-status\"",
             "id=\"loading-bar\"",
             "id=\"loading-error\"",
+            "id=\"btn-webgpu\"",
+            "id=\"btn-webgl\"",
             // The module's size for the progress, and the module itself.
             "data-wasm-size=\"0\"",
             "import init from \"./tracedraw.js\"",
