@@ -290,4 +290,37 @@ mod tests {
             .unwrap_or_default();
         assert_eq!(mime, ["application/x-tdraw"]);
     }
+
+    #[test]
+    fn the_flatpak_manifest_and_appstream_meet_flathub_rules() {
+        let metainfo = include_str!("../../../packaging/linux/flatpak/io.github.tracedraw.TraceDraw.metainfo.xml")
+            .replace("@VERSION@", "0.47.0")
+            .replace("@DATE@", "2026-11-16");
+        let doc = roxmltree::Document::parse(&metainfo).expect("metainfo XML parses");
+        assert_eq!(doc.root_element().tag_name().name(), "component");
+        for needed in [
+            "<screenshots>",
+            "<screenshot type=\"default\">",
+            "<caption>",
+            "<branding>",
+            "<launchable type=\"desktop-id\">io.github.tracedraw.TraceDraw.desktop</launchable>",
+            "<content_rating type=\"oars-1.1\"/>",
+        ] {
+            assert!(metainfo.contains(needed), "metainfo lacks {needed}");
+        }
+        assert!(!metainfo.contains("@VERSION@") && !metainfo.contains("@DATE@"));
+        assert!(!metainfo.contains('\u{2014}'));
+
+        let manifest = include_str!("../../../packaging/linux/flatpak/manifest.sh");
+        assert!(manifest.contains("s/@VERSION@/${VERSION}/g"));
+        assert!(manifest.contains("s/<icon name=\"tracedraw\"\\/>/<icon name=\"io.github.tracedraw.TraceDraw\"\\/>/"));
+        assert!(!manifest.contains("--filesystem=/media"));
+        assert!(!manifest.contains("--filesystem=/run/media"));
+        assert!(!manifest.contains('\u{2014}'));
+
+        let build_local = include_str!("../../../packaging/linux/build-local.sh");
+        assert!(build_local.contains("TRACEDRAW_TARGET_CPU:-native"));
+        assert!(build_local.contains("CI") && build_local.contains("GITHUB_ACTIONS"));
+        assert!(!build_local.contains('\u{2014}'));
+    }
 }

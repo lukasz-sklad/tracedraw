@@ -30,11 +30,9 @@ finish-args:
   - --socket=wayland
   - --socket=fallback-x11
   - --device=dri
-  # Drawings are opened and saved anywhere in the home folder, and on
-  # mounted drives, as with the other packages.
+  # Drawings are opened and saved anywhere in the home folder; removable
+  # media and external drives are reached through the desktop file portal.
   - --filesystem=home
-  - --filesystem=/media
-  - --filesystem=/run/media
 modules:
   - name: tracedraw
     buildsystem: simple
@@ -42,9 +40,10 @@ modules:
       - install -Dm755 tracedraw /app/bin/tracedraw
       - install -Dm755 tracedraw-cli /app/bin/tracedraw-cli
       - install -Dm644 src/packaging/linux/tracedraw.desktop /app/share/applications/tracedraw.desktop
-      - install -Dm644 src/packaging/linux/tracedraw-mime.xml /app/share/mime/packages/tracedraw.xml
+      - sed -e 's/<icon name="tracedraw"\/>/<icon name="io.github.tracedraw.TraceDraw"\/>/' src/packaging/linux/tracedraw-mime.xml > tracedraw.xml
+      - install -Dm644 tracedraw.xml /app/share/mime/packages/tracedraw.xml
       - for s in 16 32 64 128 256 512; do install -Dm644 src/assets/icon/tracedraw-\$s.png /app/share/icons/hicolor/\${s}x\${s}/apps/tracedraw.png; done
-      - sed -e 's/@VERSION@/${VERSION}/' -e 's/@DATE@/${DATE}/' src/packaging/linux/flatpak/io.github.tracedraw.TraceDraw.metainfo.xml > io.github.tracedraw.TraceDraw.metainfo.xml
+      - sed -e 's/@VERSION@/${VERSION}/g' -e 's/@DATE@/${DATE}/g' src/packaging/linux/flatpak/io.github.tracedraw.TraceDraw.metainfo.xml > io.github.tracedraw.TraceDraw.metainfo.xml
       - install -Dm644 io.github.tracedraw.TraceDraw.metainfo.xml /app/share/metainfo/io.github.tracedraw.TraceDraw.metainfo.xml
     sources:
 YML

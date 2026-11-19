@@ -10,6 +10,10 @@
   <developer id="io.github.tracedraw">
     <name>TraceDraw members and contributors</name>
   </developer>
+  <branding>
+    <color type="primary" scheme_preference="light">#dbeafe</color>
+    <color type="primary" scheme_preference="dark">#1e3a5f</color>
+  </branding>
   <description>
     <p>
       TraceDraw is an open-source vector editor written from scratch in Rust,
@@ -40,6 +44,24 @@
     <control>pointing</control>
     <control>keyboard</control>
   </supports>
+  <screenshots>
+    <screenshot type="default">
+      <caption>A poster drawn on five layers, with the property bar and the Objects panel</caption>
+      <image>https://raw.githubusercontent.com/tracedraw/tracedraw/v@VERSION@/docs/images/tracedraw-hero.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>Node editing with the Shape tool and curve handles</caption>
+      <image>https://raw.githubusercontent.com/tracedraw/tracedraw/v@VERSION@/docs/images/tracedraw-curves.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>Six live effects on one page with the Blend panel</caption>
+      <image>https://raw.githubusercontent.com/tracedraw/tracedraw/v@VERSION@/docs/images/tracedraw-effects.jpg</image>
+    </screenshot>
+    <screenshot>
+      <caption>Two justified columns with drop caps, hyphenation and the Text panel</caption>
+      <image>https://raw.githubusercontent.com/tracedraw/tracedraw/v@VERSION@/docs/images/tracedraw-type.jpg</image>
+    </screenshot>
+  </screenshots>
   <releases>
     <release version="@VERSION@" date="@DATE@"/>
   </releases>
