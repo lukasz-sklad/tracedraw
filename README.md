@@ -20,6 +20,9 @@
 
 <p align="center">
   <a href="https://github.com/tracedraw/tracedraw/releases"><b>Download</b></a> &middot;
+  <a href="https://github.com/lukasz-sklad/tracedraw/tree/steamdeck"><b>Steam Deck Flatpak (gałąź)</b></a> &middot;
+  <a href="https://github.com/lukasz-sklad/tracedraw/releases/tag/v0.49.0-steamdeck">Steam Deck Releases</a> &middot;
+  <a href="https://github.com/lukasz-sklad/tracedraw/tree/pr/flathub-wayland-linux-build">Gałąź PR do upstream</a> &middot;
   <a href="https://apps.microsoft.com/detail/9P50L12VHF33">Microsoft Store</a>* &middot;
   <a href="https://tracedraw.github.io/tracedraw/">Open it in the browser</a> &middot;
   <a href="docs/features.md">Feature status</a> &middot;
@@ -37,6 +40,61 @@
 <p align="center">
   <sub>Alpha: expect bugs. A <code>.cdr</code> file that does not open right? <a href="https://github.com/tracedraw/tracedraw/issues/new?template=cdr_file.yml">Send it in an issue</a>: sample files are what improves the reader most.</sub>
 </p>
+
+<!-- FORK-ONLY START (lukasz-sklad/tracedraw): never push or PR this section to upstream -->
+> **Fork-only (`lukasz-sklad/tracedraw`):** Ten rozdział dotyczy wyłącznie lokalnego forka zoptymalizowanego pod Steam Deck / SteamOS oraz polskiej wersji Web (`tracedraw.lmk.one`). Trzymany w osobnym commicie, nigdy nie wysyłany do upstream (`tracedraw/tracedraw`).
+
+## Wersja Steam Deck / SteamOS (`znver2 + PGO`) i wersja Web
+
+- **Osobna gałąź z lokalnym Flatpakiem (`steamdeck`):** [github.com/lukasz-sklad/tracedraw/tree/steamdeck](https://github.com/lukasz-sklad/tracedraw/tree/steamdeck) ([bezpośredni plik `.flatpak`](https://github.com/lukasz-sklad/tracedraw/raw/refs/heads/steamdeck/TraceDraw-0.49.0-SteamMachine-znver2-PGO.flatpak))
+- **Wydanie w Releases (`v0.49.0-steamdeck`):** [github.com/lukasz-sklad/tracedraw/releases/tag/v0.49.0-steamdeck](https://github.com/lukasz-sklad/tracedraw/releases/tag/v0.49.0-steamdeck) *(paczka `0.49.0` zoptymalizowana pod Zen 2 + PGO + Fat LTO)*
+- **Czysta gałąź pod Pull Request do upstream (`pr/flathub-wayland-linux-build`):** [pr/flathub-wayland-linux-build](https://github.com/lukasz-sklad/tracedraw/tree/pr/flathub-wayland-linux-build) ([utwórz PR na GitHub](https://github.com/tracedraw/tracedraw/compare/main...lukasz-sklad:tracedraw:pr/flathub-wayland-linux-build))
+- **Wersja Web WASM (PL, Sepia, parametry URL):** [https://tracedraw.lmk.one/?new](https://tracedraw.lmk.one/?new)
+- **Rozmiar i suma SHA-256 (gałąź `steamdeck`):** `32 156 064 B`, `04f80730da15ef6d92b2dac4954d54abe3c37d1b392f11ae07675dac2bc203ff`
+
+### Szybka instalacja na SteamOS / Linux
+
+```bash
+curl -LO https://github.com/lukasz-sklad/tracedraw/raw/refs/heads/steamdeck/TraceDraw-0.49.0-SteamMachine-znver2-PGO.flatpak
+flatpak install --user -y ./TraceDraw-0.49.0-SteamMachine-znver2-PGO.flatpak
+flatpak run --user io.github.tracedraw.TraceDraw
+```
+
+### Zmiany w forku (`v0.49.0`) i przygotowane poprawki PR
+
+- **Wytyczne Flathub:** `<screenshots>` i `<branding>` w `packaging/linux/flatpak/io.github.tracedraw.TraceDraw.metainfo.xml`, przepisana ikona MIME na `io.github.tracedraw.TraceDraw` i brak `/media` / `/run/media` w `finish-args` w `packaging/linux/flatpak/manifest.sh` (dostęp przez portal XDG).
+- **Lokalna kompilacja i flagi:** `Cargo.toml` używa `lto = "fat"`, `codegen-units = 1` i `strip = "symbols"`. Skrypt `packaging/linux/build-local.sh` na lokalnej maszynie poza CI automatycznie wykrywa procesor hosta (`-C target-cpu=native` m.in. dla Steam Deck / Steam Machine), natomiast kompilacje w GitHub Actions zachowują standardowy bazowy CPU.
+- **Poprawka okna KDE Wayland:** pomijanie małego splash screena na natywnym Waylandzie, ochrona `window_maximized` i `window_size` przed nadpisaniem przejściowym rozmiarem, zapis ustawień przy zamknięciu oraz automatyczne dopasowanie widoku dokumentu po późnym powiększeniu okna.
+- **Tylko w forku:** wyłączone automatyczne sprawdzanie aktualizacji online przy starcie, wyłączone automatyczne budowanie CI na push w forku, dodany motyw **Sepia**, domyślny język polski, przełącznik akceleracji GPU na ekranie ładowania oraz parametry URL wersji Web (`?new`, `?empty`, `?sample`, `?file=`, `?theme=`, `?lang=`, `?backend=webgpu|webgl2`, `?webgl=1`).
+
+### Benchmark A/B: Upstream `v0.47.0` vs Steam Deck `znver2 + PGO + Fat LTO`
+
+Pomiar wykonany na `AMD Custom CPU 1772` (12 wątków) oraz GPU `AMD Steam Machine (RADV NAVI33)` w tej samej piaskownicy Flatpak (`org.freedesktop.Platform//26.08`) i bezpośrednio na natywnych ELF (`1` rozgrzewka + `5` naprzemiennych przebiegów, scena wektorowa `12 001` krzywych Beziera).
+
+#### Binaria i zestaw instrukcji
+
+| Parametr | Upstream `v0.47.0` (`x86_64`) | Steam Deck `v0.47.0` (`znver2 + PGO`) |
+|---|---|---|
+| GUI `tracedraw` / CLI `tracedraw-cli` | `88 MB` / `19 MB` | **`84 MB`** / **`17 MB`** |
+| Max symbol `GLIBC` | `GLIBC_2.35` | `GLIBC_2.39` |
+| Instrukcje AVX2 / FMA / BMI (GUI) | `18 001` | **`242 468`** (**13,5x więcej**) |
+| Instrukcje AVX2 / FMA / BMI (CLI) | `4 094` | **`46 510`** (**11,4x więcej**) |
+
+#### Wyniki wydajności (mediana / min z 5 prób)
+
+| Test | Upstream `v0.47.0` | Steam Deck `znver2 + PGO` | Różnica |
+|---|---|---|---|
+| **Flatpak:** `SVG 12k -> PNG 4096px` *(z narzutem ~93.7 ms bwrap)* | `528.8 ms` (`522.2`) | `523.5 ms` (`501.3`) | `1.01x` (`+1.0%`) |
+| **Flatpak:** `TDRAW 12k -> PNG 4096px` *(z narzutem bwrap)* | `721.6 ms` (`705.9`) | **`692.2 ms`** (`652.4`) | **`1.04x`** (**`+4.1%`**) |
+| **Flatpak:** `SVG 12k -> TDRAW` *(z narzutem bwrap)* | `236.3 ms` (`231.5`) | **`220.0 ms`** (`207.4`) | **`1.07x`** (**`+6.9%`**) |
+| **Flatpak:** `TDRAW 12k -> PDF` *(z narzutem bwrap)* | `556.5 ms` (`552.6`) | **`526.9 ms`** (`513.5`) | **`1.06x`** (**`+5.3%`**) |
+| **Flatpak:** `CDR 12k -> SVG` *(z narzutem bwrap)* | `315.0 ms` (`299.0`) | **`304.5 ms`** (`296.2`) | **`1.03x`** (**`+3.3%`**) |
+| **Natywny ELF (bez bwrap):** `TDRAW 12k -> PNG 4096px` | `636.7 ms` (`624.7`) | **`588.0 ms`** (`576.4`) | **`1.08x`** (**`+7.6%`**) |
+| **Natywny ELF (bez bwrap):** `TDRAW 12k -> CDR` | `569.2 ms` (`563.2`) | **`530.5 ms`** (`529.1`) | **`1.07x`** (**`+6.8%`**) |
+| **Natywny ELF (bez bwrap):** `Stress 500x mutacji (.cdr)` | `393.9 ms` (`390.1`) | `400.4 ms` (`398.7`) | `0.98x` (`-1.6%`) |
+| **GUI Start -> 1. klatka Vulkan** (`RADV NAVI33`, Flatpak) | `0.21 s` | **`0.17 s`** | **-19% czasu startu** |
+
+<!-- FORK-ONLY END -->
 
 <br>
 
